@@ -1,0 +1,7 @@
+parser.out
+*.vhd
+*.fmt
+*.log
+*.mem
+*.psm
+*.pyc
