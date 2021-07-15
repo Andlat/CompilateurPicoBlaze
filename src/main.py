@@ -55,8 +55,12 @@ class Machine:
         self.registers = [False]*10
         self.memmap = {}
         self.next_addr = 0
-
+        self.label_index = 0
         pass
+
+    def labelGen(self):
+        self.label_index = self.label_index + 1
+        return "label" + str(self.label_index) 
 
     # Get the next available register
     def getRegister(self):
@@ -89,6 +93,7 @@ class Machine:
 
 class Expr: pass
 
+
 class BinOp(Expr):
     def __init__(self,left,op,right):
         self.left = left
@@ -106,6 +111,43 @@ class BinOp(Expr):
         print("%s s%i, s%i"%(ops[self.op], r1, r2))
         machine.freeRegister(r2)
         return r1
+
+# stores results in Z & NZ flags
+class EqualsOP(Expr):
+    def __init__(self,left,right):
+        self.left = left
+        self.right = right
+
+    def eval(self, machine):
+        r1 = self.left.eval(machine)
+        r2 = self.right.eval(machine)
+        print("COMPARE s%i, s%i"%(r1, r2))
+        
+        return 0
+
+
+class If(Expr):
+    def __init__(self, instructions):
+        self.instructions = instructions
+      
+    def eval(self, machine):
+        label = machine.labelGen()
+        self.instructions = self.instructions[3:]
+        bracketBegin = int(self.instructions.find('{') - 1)
+        condition = self.instructions[0 : bracketBegin]
+        cond = parser.parse(condition + ';')
+        cond.eval(machine)
+        print("JUMP NZ, %s"%(label))
+        self.instructions = self.instructions[bracketBegin + 2 : int(self.instructions.find('}'))]
+        
+        for instru in self.instructions.split(';') :
+            instru.strip()
+            if instru : 
+                instr = parser.parse(instru + ';')
+                instr.eval(machine)
+                
+        print(f'{label}:')
+        return 0
 
 class AssignOp(Expr):
     def __init__(self, left, right):
@@ -172,6 +214,7 @@ class Statement():
         machine.freeAllRegisters()
 
 
+
 # List of token names.   This is always required
 tokens = (
    'NUMBER',
@@ -184,11 +227,13 @@ tokens = (
    'LBRACK',
    'RBRACK',
    'PORT',
-   'SEMICOLON'
+   'SEMICOLON',
+   'ISEQUAL',
+   'IF'
 )
 
 # Regular expression rules for simple tokens
-t_EQUAL   = r'\='
+t_EQUAL   = r'(?<!\=)\=(?!\=)'
 t_PLUS    = r'\+'
 t_MINUS   = r'-'
 t_LPAREN  = r'\('
@@ -197,11 +242,16 @@ t_LBRACK  = r'\['
 t_RBRACK  = r'\]'
 t_PORT    = r'\$'
 t_SEMICOLON = r'\;'
+t_ISEQUAL = r'\=\='
 
 # A regular expression rule with some action code
 def t_NUMBER(t):
     r'\d+'
     t.value = int(t.value)
+    return t
+
+def t_IF(t):
+    r'if(.*)\{.*\}'
     return t
 
 reserved = {}
@@ -229,7 +279,9 @@ lexer = lex.lex()
 # Yacc (syntax)
 
 precedence = (
+    ('left', 'IF'),
     ('left', 'EQUAL'),
+    ('left', 'ISEQUAL'),
     ('left', 'PLUS', 'MINUS')
 )
 
@@ -256,6 +308,14 @@ def p_expression_binop(p):
     '''expression : expression PLUS expression
                   | expression MINUS expression'''
     p[0] = BinOp(p[1], p[2], p[3])
+
+def p_expression_equalsop(p):
+    '''expression : expression ISEQUAL expression'''
+    p[0] = EqualsOP(p[1], p[3])
+
+def p_expression_if(p):
+    '''expression : IF'''
+    p[0] = If(p[1])
 
 def p_expression_term(p):
     '''expression : term'''
