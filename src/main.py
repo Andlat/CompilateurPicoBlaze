@@ -141,7 +141,7 @@ class If(Expr):
         self.instructions = self.instructions[bracketBegin + 2 : int(self.instructions.find('}'))]
         
         for instru in self.instructions.split(';') :
-            instru.strip()
+            instru = instru.strip()
             if instru : 
                 instr = parser.parse(instru + ';')
                 instr.eval(machine)
@@ -280,8 +280,8 @@ lexer = lex.lex()
 
 precedence = (
     ('left', 'IF'),
-    ('left', 'EQUAL'),
     ('left', 'ISEQUAL'),
+    ('left', 'EQUAL'),
     ('left', 'PLUS', 'MINUS')
 )
 
